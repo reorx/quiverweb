@@ -4,6 +4,8 @@ import os
 import json
 import logging
 
+import requests
+
 
 NOTEBOOK_KEYS = ['name', 'uuid']
 
@@ -12,8 +14,39 @@ NOTE_KEYS = ['uuid', 'title', 'cells', 'tags', 'created_at', 'updated_at']
 lg = logging.getLogger('quiverweb.sync')
 
 
-def fetch_remote_index():
-    return {}, {}
+class RequestError(Exception):
+    pass
+
+
+class WebAPI(object):
+    def __init__(self, base_url):
+        self.base_url = base_url
+
+    def _url(self, uri):
+        return self.base_url + uri
+
+    def request(self, method, uri, *args, **kwargs):
+        request_func = getattr(requests, method.lower())
+        url = self._url(uri)
+        try:
+            resp = request_func(url, *args, **kwargs)
+        except requests.exceptions.RequestException as e:
+            raise RequestError(str(e))
+        if resp.status_code > 299:
+            raise RequestError('request error: {}, {}'.format(resp.status_code, resp.content))
+
+        if resp.content:
+            return resp.json()
+        else:
+            return None
+
+    def get_notebooks_index(self):
+        d = self.request('get', '/notebooks/index')
+        return d
+
+    def get_notes_index(self):
+        d = self.request('get', '/notes/index')
+        return d
 
 
 def get_change_list(quiver_path, remote_notebooks_index, remote_notes_index):
@@ -191,8 +224,12 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     quiver_path = get_env('QUIVERWEB_LIBRARY_PATH')
+    api_url = get_env('QUIVERWEB_API_URL')
 
-    notebooks_index, notes_index = fetch_remote_index()
+    api = WebAPI(api_url)
+
+    notebooks_index = api.get_notebooks_index()
+    notes_index = api.get_notes_index()
 
     get_change_list(quiver_path, notebooks_index, notes_index)
 

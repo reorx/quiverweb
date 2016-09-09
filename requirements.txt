@@ -1,2 +1,3 @@
 torext
 -e git+git@github.com:reorx/simplemongo.git@87fff5e0f4ea56b668b4fa510c76225c7bc0d951#egg=simplemongo
+requests

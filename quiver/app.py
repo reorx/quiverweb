@@ -21,6 +21,12 @@ class NotebooksHandler(BaseHandler):
         pass
 
 
+@app.route('/api/notebooks/index')
+class NotebooksIndexHandler(BaseHandler):
+    def get(self):
+        self.write_json({})
+
+
 @app.route('/api/notes')
 class NotesHandler(BaseHandler):
     def get(self):
@@ -31,6 +37,12 @@ class NotesHandler(BaseHandler):
 
     def put(self):
         pass
+
+
+@app.route('/api/notes/index')
+class NotesIndexHandler(BaseHandler):
+    def get(self):
+        self.write_json({})
 
 
 if '__main__' == __name__:
