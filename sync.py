@@ -48,8 +48,32 @@ class WebAPI(object):
         d = self.request('get', '/notes/index')
         return d
 
+    def get_resources_index(self):
+        d = self.request('get', '/resources/index')
+        return d
 
-def get_change_list(quiver_path, remote_notebooks_index, remote_notes_index):
+    def post_notebooks_sync(self, changes):
+        d = self.request('post', '/notebooks/sync', json=changes)
+        return d
+
+    def post_notes_sync(self, changes):
+        d = self.request('post', '/notes/sync', json=changes)
+        return d
+
+    def post_resource(self, rs):
+        d = self.request('post', '/resources', json=rs)
+        return d
+
+    def put_resource(self, rs):
+        d = self.request('put', '/resources/{}'.format(rs['id']), json=rs)
+        return d
+
+    def delete_resource(self, rs_id):
+        d = self.request('delete', '/resources/{}'.format(rs_id))
+        return d
+
+
+def get_all_changes(quiver_path, remote_notebooks_index, remote_notes_index, remote_resources_index):
     """
     remote_notebooks_index = {
         'Inbox': 1452326207,
@@ -60,7 +84,7 @@ def get_change_list(quiver_path, remote_notebooks_index, remote_notes_index):
         '02FEC1AA-AB0E-4686-B54D-50D87AD7C4A1': 1452326207,
     }
 
-    change_list = {
+    all_changes = {
         'notebook': {
             'create': [],
             'update': [],
@@ -70,35 +94,44 @@ def get_change_list(quiver_path, remote_notebooks_index, remote_notes_index):
             'create': [],
             'update': [],
             'delete': [],
+        },
+        'resource': {
+            'create': [],
+            'update': [],
+            'delete': [],
         }
     }
     """
     def _path(*args):
         return reduce(lambda x, y: os.path.join(x, y), [quiver_path] + list(args))
 
-    notebooks, notebooks_dict = get_notebooks(quiver_path)
+    notebooks_dict = get_notebooks(quiver_path)
     #print 'notebooks_dict', notebooks_dict
 
-    notes = []
     notes_dict = {}
-    for nb in notebooks:
-        _notes, _notes_index = get_notebook_notes(nb)
-        notes += _notes
-        notes_dict.update(_notes_index)
+    resources_dict = {}
+
+    for nb in notebooks_dict.itervalues():
+        _notes_dict = get_notebook_notes(nb)
+        notes_dict.update(_notes_dict)
+
+        for n in _notes_dict.itervalues():
+            resources_dict.update(n['resources'])
     #print 'notes_dict', notes_dict
 
-    change_list = {
+    all_changes = {
         'notebook': get_changes(notebooks_dict, remote_notebooks_index),
         'note': get_changes(notes_dict, remote_notes_index),
+        'resource': get_changes(resources_dict, remote_resources_index),
     }
 
-    change_list_summary = {
+    all_changes_summary = {
         k: {_k: len(_v) for _k, _v in changes.iteritems()}
-        for k, changes in change_list.iteritems()
+        for k, changes in all_changes.iteritems()
     }
-    lg.info('change_list summary: \n%s', json.dumps(change_list_summary, indent=4))
+    lg.info('all_changes summary: \n%s', json.dumps(all_changes_summary, indent=4))
 
-    return change_list
+    return all_changes
 
 
 def get_changes(local_dict, remote_index):
@@ -131,7 +164,6 @@ def get_notebooks(quiver_path):
         return reduce(lambda x, y: os.path.join(x, y), [quiver_path] + list(args))
 
     root, dirs, files = os.walk(quiver_path).next()
-    l = []
     d = {}
     for dir in dirs:
         metapath = _path(dir, 'meta.json')
@@ -154,20 +186,20 @@ def get_notebooks(quiver_path):
         # move `uuid` -> `id`
         nb['id'] = nb.pop('uuid')
 
-        l.append(nb)
         d[nb['id']] = nb
 
-    return l, d
+    return d
 
 
 def get_notebook_notes(notebook):
     def _path(*args):
         return reduce(lambda x, y: os.path.join(x, y), [notebook['path']] + list(args))
 
-    root, dirs, files = os.walk(notebook['path']).next()
-    l = []
+    _r, dirs, _f = os.walk(notebook['path']).next()
     d = {}
     for dir in dirs:
+        note_path = os.path.join(notebook['path'], dir)
+
         note = get_file_content(_path(dir, 'content.json'), as_json=True)
         note.update(get_file_content(_path(dir, 'meta.json'), as_json=True))
 
@@ -181,10 +213,28 @@ def get_notebook_notes(notebook):
         # move `uuid` -> `id`
         note['id'] = note.pop('uuid')
 
-        l.append(note)
+        # add `resources`
+        resources = {}
+        resources_path = os.path.join(note_path, 'resources')
+        if os.path.exists(resources_path):
+            _r, _d, resource_files = os.walk(resources_path).next()
+            for name in resource_files:
+                rs_id, rs_ext = tuple(name.split('.'))
+                rs_stat = get_file_stat(os.path.join(resources_path, name))
+                rs = {
+                    'id': rs_id,
+                    'ext': rs_ext,
+                    'created_at': rs_stat['st_ctime'],
+                    'updated_at': rs_stat['st_mtime'],
+                }
+                resources[rs_id] = rs
+        note['resources'] = resources
+
         d[note['id']] = note
 
-    return l, d
+        print note
+
+    return d
 
 
 def get_file_content(filepath, as_json=False):
@@ -230,8 +280,9 @@ def main():
 
     notebooks_index = api.get_notebooks_index()
     notes_index = api.get_notes_index()
+    resources_index = api.get_resources_index()
 
-    get_change_list(quiver_path, notebooks_index, notes_index)
+    get_all_changes(quiver_path, notebooks_index, notes_index, resources_index)
 
 
 if __name__ == '__main__':

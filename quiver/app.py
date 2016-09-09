@@ -45,6 +45,12 @@ class NotesIndexHandler(BaseHandler):
         self.write_json({})
 
 
+@app.route('/api/resources/index')
+class ResourcesIndexHandler(BaseHandler):
+    def get(self):
+        self.write_json({})
+
+
 if '__main__' == __name__:
     app.command_line_config()
     app.run()
