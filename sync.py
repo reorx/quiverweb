@@ -12,6 +12,10 @@ NOTE_KEYS = ['uuid', 'title', 'cells', 'tags', 'created_at', 'updated_at']
 lg = logging.getLogger('quiverweb.sync')
 
 
+def fetch_remote_index():
+    return {}, {}
+
+
 def get_change_list(quiver_path, remote_notebooks_index, remote_notes_index):
     """
     remote_notebooks_index = {
@@ -176,8 +180,22 @@ def check_dict_keys(d, keys):
             raise KeyError('Key {} not in dict: {}'.format(i, d))
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    quiver_path = '/Users/reorx/Dropbox/Library/Quiver.qvlibrary'
+def get_env(key, default=None):
+    v = os.environ.get(key, default)
+    if not v:
+        raise ValueError('could not get {} from env'.format(key))
+    return v
 
-    get_change_list(quiver_path, {}, {})
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+
+    quiver_path = get_env('QUIVERWEB_LIBRARY_PATH')
+
+    notebooks_index, notes_index = fetch_remote_index()
+
+    get_change_list(quiver_path, notebooks_index, notes_index)
+
+
+if __name__ == '__main__':
+    main()
