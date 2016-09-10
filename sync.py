@@ -1,8 +1,11 @@
 # coding: utf-8
 
+from __future__ import print_function
+
 import os
 import json
 import logging
+import logging.config
 
 import requests
 
@@ -12,6 +15,29 @@ NOTEBOOK_KEYS = ['name', 'uuid']
 NOTE_KEYS = ['uuid', 'title', 'cells', 'tags', 'created_at', 'updated_at']
 
 lg = logging.getLogger('quiverweb.sync')
+
+
+class Env(object):
+    prefix = 'QUIVERWEB'
+    _instances = {}
+
+    def __init__(self, key, default=None, allow_null=False):
+        self.key = key.format(prefix=self.prefix)
+        self.default = default
+        self.allow_null = allow_null
+        Env._instances[self.key] = self
+
+    def get(self):
+        v = os.environ.get(self.key, self.default)
+        if not self.allow_null and not v:
+            raise ValueError('No value for {} is not allowed'.format(self.key))
+        return v
+
+
+class envs:  # NOQA
+    LIBRARY_PATH = Env('{prefix}_LIBRARY_PATH')
+    API_URL = Env('{prefix}_API_URL')
+    LOG_LEVEL = Env('{prefix}_LOG_LEVEL', 'INFO')
 
 
 class RequestError(Exception):
@@ -106,7 +132,7 @@ def get_all_changes(quiver_path, remote_notebooks_index, remote_notes_index, rem
         return reduce(lambda x, y: os.path.join(x, y), [quiver_path] + list(args))
 
     notebooks_dict = get_notebooks(quiver_path)
-    #print 'notebooks_dict', notebooks_dict
+    #print('notebooks_dict', notebooks_dict)
 
     notes_dict = {}
     resources_dict = {}
@@ -117,7 +143,7 @@ def get_all_changes(quiver_path, remote_notebooks_index, remote_notes_index, rem
 
         for n in _notes_dict.itervalues():
             resources_dict.update(n['resources'])
-    #print 'notes_dict', notes_dict
+    #print('notes_dict', notes_dict)
 
     all_changes = {
         'notebook': get_changes(notebooks_dict, remote_notebooks_index),
@@ -232,7 +258,7 @@ def get_notebook_notes(notebook):
 
         d[note['id']] = note
 
-        print note
+        print(note)
 
     return d
 
@@ -263,18 +289,42 @@ def check_dict_keys(d, keys):
             raise KeyError('Key {} not in dict: {}'.format(i, d))
 
 
-def get_env(key, default=None):
-    v = os.environ.get(key, default)
-    if not v:
-        raise ValueError('could not get {} from env'.format(key))
-    return v
+def setup_logging(level):
+    logging.config.dictConfig({
+        'version': 1,
+        'disable_existing_loggers': False,
+        'loggers': {
+            '': {
+                'handlers': ['stream'],
+                'level': level,
+            },
+            'requests': {
+                'level': 'DEBUG',
+            }
+        },
+        'handlers': {
+            'stream': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'common',
+            },
+        },
+        'formatters': {
+            'common': {
+                'format': '%(asctime)s %(levelname)s %(name)s: %(message)s',
+                'datefmt': '%Y-%m-%d %H:%M:%S'
+            },
+        },
+    })
 
 
 def main():
-    logging.basicConfig(level=logging.INFO)
+    print('Envs:\n' + '\n'.join('  ' + k for k in Env._instances))
 
-    quiver_path = get_env('QUIVERWEB_LIBRARY_PATH')
-    api_url = get_env('QUIVERWEB_API_URL')
+    library_path = envs.LIBRARY_PATH.get()
+    api_url = envs.API_URL.get()
+    log_level = envs.LOG_LEVEL.get()
+
+    setup_logging(log_level)
 
     api = WebAPI(api_url)
 
@@ -282,7 +332,7 @@ def main():
     notes_index = api.get_notes_index()
     resources_index = api.get_resources_index()
 
-    get_all_changes(quiver_path, notebooks_index, notes_index, resources_index)
+    get_all_changes(library_path, notebooks_index, notes_index, resources_index)
 
 
 if __name__ == '__main__':
