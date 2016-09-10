@@ -1,4 +1,4 @@
-PROJECT = 'quiver'
+PROJECT = 'quiverweb'
 
 LOCALE = 'en_US'
 
@@ -7,6 +7,8 @@ PROCESSES = 1
 PORT = 8000
 
 DEBUG = True
+
+MONGODB_URI = 'mongodb://localhost:27017/quiverweb'
 
 LOGGERS = {
     '': {
