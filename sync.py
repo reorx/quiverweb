@@ -132,7 +132,7 @@ def get_all_changes(quiver_path, remote_notebooks_index, remote_notes_index, rem
         return reduce(lambda x, y: os.path.join(x, y), [quiver_path] + list(args))
 
     notebooks_dict = get_notebooks(quiver_path)
-    #print('notebooks_dict', notebooks_dict)
+    lg.debug('notebook data: %s', json.dumps(notebooks_dict.values()[0]))
 
     notes_dict = {}
     resources_dict = {}
@@ -143,7 +143,9 @@ def get_all_changes(quiver_path, remote_notebooks_index, remote_notes_index, rem
 
         for n in _notes_dict.itervalues():
             resources_dict.update(n['resources'])
-    #print('notes_dict', notes_dict)
+
+    lg.debug('note data: %s', json.dumps(notes_dict.values()[0]))
+    lg.debug('resource data: %s', json.dumps(resources_dict.values()[0]))
 
     all_changes = {
         'notebook': get_changes(notebooks_dict, remote_notebooks_index),
@@ -257,8 +259,6 @@ def get_notebook_notes(notebook):
         note['resources'] = resources
 
         d[note['id']] = note
-
-        print(note)
 
     return d
 

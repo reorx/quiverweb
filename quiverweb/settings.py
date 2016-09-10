@@ -8,7 +8,8 @@ PORT = 8000
 
 DEBUG = True
 
-MONGODB_URI = 'mongodb://localhost:27017/quiverweb'
+MONGODB_URI = 'mongodb://localhost:27017'
+MONGODB_NAME = 'quiverweb'
 
 LOGGERS = {
     '': {
